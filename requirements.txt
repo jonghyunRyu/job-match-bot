@@ -1,0 +1,12 @@
+# --- 1차 MVP 핵심 ---
+streamlit>=1.39.0
+google-genai>=1.0.0
+pydantic>=2.9.0
+python-dotenv>=1.0.1
+Pillow>=10.4.0
+
+# --- PDF 처리 (2차 단계에서 사용, 미리 포함) ---
+pypdf>=5.0.0
+pdf2image>=1.17.0
+# 주의: pdf2image는 시스템에 poppler 설치가 필요합니다.
+#   Windows: https://github.com/oschwartz10612/poppler-windows 설치 후 PATH 등록
