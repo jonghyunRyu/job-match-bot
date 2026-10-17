@@ -22,7 +22,7 @@ class Settings:
 
     def __init__(self) -> None:
         self.gemini_api_key: str = os.getenv("GEMINI_API_KEY", "").strip()
-        self.gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
+        self.gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-flash-latest").strip()
 
     @property
     def has_api_key(self) -> bool:
