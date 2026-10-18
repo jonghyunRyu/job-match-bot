@@ -9,7 +9,7 @@ from __future__ import annotations
 import streamlit as st
 
 from src.config import PROFILE_PATH, get_settings, load_profile
-from src.ingest.loader import load_image, load_text
+from src.ingest.loader import PdfProcessingError, load_image, load_pdf, load_text
 from src.llm.gemini import get_llm
 from src.pipeline import build_report, extract_requirements, match_profile
 
@@ -112,7 +112,9 @@ def main() -> None:
     if not _check_api_key():
         return
 
-    tab_text, tab_image = st.tabs(["텍스트 입력", "이미지(캡처) 입력"])
+    tab_text, tab_image, tab_pdf = st.tabs(
+        ["텍스트 입력", "이미지(캡처) 입력", "PDF 입력"]
+    )
 
     with tab_text:
         job_text = st.text_area("채용 공고 전문을 붙여넣으세요", height=300)
@@ -137,6 +139,31 @@ def main() -> None:
             else:
                 try:
                     run_pipeline(load_image(uploaded.getvalue()), profile_text)
+                except Exception as e:  # noqa: BLE001
+                    st.exception(e)
+
+    with tab_pdf:
+        st.caption(
+            "텍스트형 PDF는 자동으로 글자를 추출하고, 스캔형 PDF는 이미지로 변환해 "
+            "Vision으로 분석합니다. (스캔형은 시스템에 poppler 설치 필요)"
+        )
+        pdf_file = st.file_uploader("공고 PDF 업로드", type=["pdf"])
+        if st.button("분석하기", key="analyze_pdf"):
+            if pdf_file is None:
+                st.warning("PDF 파일을 업로드해주세요.")
+            else:
+                try:
+                    job = load_pdf(pdf_file.getvalue())
+                    if job.text:
+                        st.success("텍스트형 PDF로 인식: 글자를 추출했습니다.")
+                    else:
+                        st.info(
+                            f"스캔형 PDF로 인식: {len(job.images)}개 페이지를 "
+                            "이미지로 변환해 분석합니다."
+                        )
+                    run_pipeline(job, profile_text)
+                except PdfProcessingError as e:
+                    st.error(str(e))
                 except Exception as e:  # noqa: BLE001
                     st.exception(e)
 

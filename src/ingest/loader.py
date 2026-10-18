@@ -47,12 +47,77 @@ def load_image(data: bytes) -> JobInput:
     return JobInput(input_type=InputType.IMAGE, images=[image])
 
 
-def load_pdf(data: bytes) -> JobInput:  # noqa: ARG001
-    """PDF 처리 자리표시자 (2차 단계에서 구현).
+# 이 글자 수 미만이면 "스캔형(이미지) PDF"로 판단해 Vision 경로로 폴백한다.
+_MIN_TEXT_CHARS = 50
+# 스캔형 PDF를 이미지화할 때 Vision에 넘길 최대 페이지 수 (비용/속도 보호)
+_MAX_PDF_PAGES = 5
 
-    계획된 로직:
-      1) pypdf로 텍스트 추출 시도
-      2) 추출 글자가 거의 없으면(스캔형) pdf2image로 페이지를 이미지화
-      3) 이미지 경로는 Gemini Vision으로 폴백
+
+class PdfProcessingError(RuntimeError):
+    """PDF 처리 중 복구 불가능한 오류 (예: poppler 미설치)."""
+
+
+def _extract_pdf_text(data: bytes) -> str:
+    """pypdf로 PDF의 모든 페이지에서 텍스트를 추출한다."""
+    from pypdf import PdfReader
+
+    reader = PdfReader(io.BytesIO(data))
+    parts: List[str] = []
+    for page in reader.pages:
+        extracted = page.extract_text() or ""
+        if extracted.strip():
+            parts.append(extracted.strip())
+    return "\n\n".join(parts).strip()
+
+
+def _render_pdf_to_images(data: bytes) -> List[Image]:
+    """스캔형 PDF를 페이지별 이미지로 변환한다 (pdf2image + poppler).
+
+    poppler가 설치돼 있지 않으면 PdfProcessingError로 명확히 안내한다.
     """
-    raise NotImplementedError("PDF 처리는 2차 단계에서 구현 예정입니다.")
+    try:
+        from pdf2image import convert_from_bytes
+    except ImportError as exc:  # pragma: no cover - 의존성 미설치
+        raise PdfProcessingError(
+            "pdf2image가 설치되지 않았습니다. requirements.txt를 설치해주세요."
+        ) from exc
+
+    try:
+        pages = convert_from_bytes(
+            data, first_page=1, last_page=_MAX_PDF_PAGES
+        )
+    except Exception as exc:  # pdf2image는 poppler 미설치 시 여기서 실패
+        raise PdfProcessingError(
+            "PDF를 이미지로 변환하지 못했습니다. 스캔형 PDF 처리는 시스템에 "
+            "poppler 설치가 필요합니다.\n"
+            "  Windows: https://github.com/oschwartz10612/poppler-windows "
+            "에서 받아 PATH에 등록하세요.\n"
+            "  (대안: 공고를 텍스트로 붙여넣거나 이미지로 캡처해 올려주세요.)"
+        ) from exc
+
+    images: List[Image] = []
+    for page in pages:
+        images.append(page.convert("RGB") if page.mode not in ("RGB", "L") else page)
+    return images
+
+
+def load_pdf(data: bytes) -> JobInput:
+    """PDF 입력을 정규화한다.
+
+    로직:
+      1) pypdf로 텍스트 추출 시도
+      2) 추출 글자가 충분하면(텍스트형) 텍스트 경로로 처리
+      3) 글자가 거의 없으면(스캔형) pdf2image로 페이지를 이미지화해 Vision 폴백
+    """
+    text = _extract_pdf_text(data)
+    if len(text) >= _MIN_TEXT_CHARS:
+        return JobInput(input_type=InputType.PDF, text=text)
+
+    # 스캔형으로 판단 → 이미지 경로 폴백
+    images = _render_pdf_to_images(data)
+    if not images:
+        raise PdfProcessingError(
+            "PDF에서 텍스트도 이미지도 추출하지 못했습니다. "
+            "다른 형식(텍스트/이미지)으로 입력해주세요."
+        )
+    return JobInput(input_type=InputType.PDF, images=images)
