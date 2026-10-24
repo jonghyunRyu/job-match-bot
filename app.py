@@ -11,7 +11,7 @@ import streamlit as st
 from src.config import PROFILE_PATH, get_settings, load_profile
 from src.ingest.loader import PdfProcessingError, load_image, load_pdf, load_text
 from src.llm.gemini import get_llm
-from src.pipeline import build_report, extract_requirements, match_profile
+from src.graph import run_graph
 
 st.set_page_config(page_title="공고 매칭봇", page_icon="🎯", layout="wide")
 
@@ -79,22 +79,27 @@ def render_report(report, match_result) -> None:
 
 
 def run_pipeline(job_input, profile_text: str) -> None:
-    """추출 → 매칭 → 리포트 파이프라인을 실행하고 결과를 렌더링한다."""
+    """LangGraph 파이프라인(추출→매칭→리포트)을 실행하고 결과를 렌더링한다."""
     llm = get_llm()
 
-    with st.status("분석 중...", expanded=True) as status:
-        st.write("1/3 공고에서 요구 역량 추출 중...")
-        requirements = extract_requirements(job_input, llm)
-
-        st.write("2/3 관련 경험 검색(RAG) 후 매칭 중...")
-        match_result = match_profile(requirements, profile_text, llm)
-
-        st.write("3/3 리포트 생성 중...")
-        report = build_report(requirements, match_result, llm)
-
+    with st.status("분석 중... (추출 → 매칭 → 리포트)", expanded=True) as status:
+        st.write("공고 분석 그래프 실행 중...")
+        final_state = run_graph(job_input, profile_text, llm)
         status.update(label="분석 완료", state="complete", expanded=False)
 
-    if requirements.job_title or requirements.company:
+    requirements = final_state.get("requirements")
+    match_result = final_state.get("match_result")
+    report = final_state.get("report")
+
+    # 추출 단계에서 역량을 하나도 못 찾아 그래프가 조기 종료된 경우
+    if report is None or match_result is None:
+        st.warning(
+            "공고에서 요구 역량을 추출하지 못했습니다. "
+            "공고 내용이 충분한지 확인하거나 다른 입력으로 시도해주세요."
+        )
+        return
+
+    if requirements and (requirements.job_title or requirements.company):
         header = " / ".join(
             x for x in (requirements.company, requirements.job_title) if x
         )
