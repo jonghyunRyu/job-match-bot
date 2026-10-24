@@ -24,9 +24,10 @@ T = TypeVar("T", bound=BaseModel)
 class GeminiClient(LLMClient):
     """Google Gemini 어댑터."""
 
-    def __init__(self, api_key: str, model: str) -> None:
+    def __init__(self, api_key: str, model: str, embed_model: str) -> None:
         self._client = genai.Client(api_key=api_key)
         self._model = model
+        self._embed_model = embed_model
 
     def _build_contents(
         self, prompt: str, images: Optional[List[Image]]
@@ -72,6 +73,20 @@ class GeminiClient(LLMClient):
         # 폴백: 원문 JSON을 직접 검증
         return schema.model_validate_json(response.text or "{}")
 
+    def embed(
+        self,
+        texts: List[str],
+        task_type: str = "RETRIEVAL_DOCUMENT",
+    ) -> List[List[float]]:
+        if not texts:
+            return []
+        response = self._client.models.embed_content(
+            model=self._embed_model,
+            contents=texts,
+            config=types.EmbedContentConfig(task_type=task_type),
+        )
+        return [list(e.values) for e in response.embeddings]
+
 
 @lru_cache(maxsize=1)
 def get_llm() -> GeminiClient:
@@ -85,4 +100,8 @@ def get_llm() -> GeminiClient:
             "GEMINI_API_KEY가 설정되지 않았습니다. .env 파일에 키를 넣어주세요. "
             "(.env.example 참고)"
         )
-    return GeminiClient(api_key=settings.gemini_api_key, model=settings.gemini_model)
+    return GeminiClient(
+        api_key=settings.gemini_api_key,
+        model=settings.gemini_model,
+        embed_model=settings.gemini_embed_model,
+    )

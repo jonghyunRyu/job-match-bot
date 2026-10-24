@@ -23,6 +23,11 @@ class Settings:
     def __init__(self) -> None:
         self.gemini_api_key: str = os.getenv("GEMINI_API_KEY", "").strip()
         self.gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-flash-latest").strip()
+        self.gemini_embed_model: str = os.getenv(
+            "GEMINI_EMBED_MODEL", "gemini-embedding-001"
+        ).strip()
+        # RAG 검색 시 매칭에 넣을 프로필 청크 수
+        self.rag_top_k: int = int(os.getenv("RAG_TOP_K", "4"))
 
     @property
     def has_api_key(self) -> bool:

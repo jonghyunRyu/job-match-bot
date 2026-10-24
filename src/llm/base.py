@@ -39,3 +39,17 @@ class LLMClient(ABC):
         멀티모달 입력(이미지)을 함께 넘길 수 있어 Vision 추출에도 쓰인다.
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def embed(
+        self,
+        texts: List[str],
+        task_type: str = "RETRIEVAL_DOCUMENT",
+    ) -> List[List[float]]:
+        """텍스트 목록을 임베딩 벡터 목록으로 변환한다 (RAG용).
+
+        task_type: 임베딩 용도 힌트.
+          - RETRIEVAL_DOCUMENT: 저장할 문서(프로필 청크) 임베딩
+          - RETRIEVAL_QUERY: 검색 쿼리(요구 역량) 임베딩
+        """
+        raise NotImplementedError

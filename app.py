@@ -86,7 +86,7 @@ def run_pipeline(job_input, profile_text: str) -> None:
         st.write("1/3 공고에서 요구 역량 추출 중...")
         requirements = extract_requirements(job_input, llm)
 
-        st.write("2/3 내 프로필과 매칭 중...")
+        st.write("2/3 관련 경험 검색(RAG) 후 매칭 중...")
         match_result = match_profile(requirements, profile_text, llm)
 
         st.write("3/3 리포트 생성 중...")
