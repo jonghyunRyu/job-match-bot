@@ -24,11 +24,16 @@ T = TypeVar("T", bound=BaseModel)
 R = TypeVar("R")
 
 # 재시도할 일시적 서버 오류 상태 코드
-#   429: 요청 과다(rate limit)
 #   500: 내부 서버 오류
 #   503: 일시적 과부하(UNAVAILABLE)
 #   504: 게이트웨이 타임아웃
-_RETRIABLE_STATUS = {429, 500, 503, 504}
+# 참고: 429는 무료 티어에서 보통 "할당량 소진"이라 기다려도 즉시 안 풀리고,
+#       재시도하면 할당량만 더 쓰므로 재시도 대상에서 제외한다.
+_RETRIABLE_STATUS = {500, 503, 504}
+
+
+class QuotaExceededError(RuntimeError):
+    """API 할당량(quota) 초과. 무료 티어 한도 소진 시 발생."""
 
 
 def _status_of(exc: Exception) -> Optional[int]:
@@ -52,6 +57,13 @@ def _call_with_retry(fn: Callable[[], R], max_retries: int) -> R:
             return fn()
         except genai_errors.APIError as exc:
             status = _status_of(exc)
+            if status == 429:
+                # 할당량 초과: 재시도 무의미 → 명확한 메시지로 변환
+                raise QuotaExceededError(
+                    "Gemini API 할당량을 초과했습니다(429). 무료 티어 한도가 "
+                    "소진되었거나 분당 요청이 많습니다. 잠시 후 다시 시도하거나 "
+                    "요금제를 확인하세요."
+                ) from exc
             if status not in _RETRIABLE_STATUS or attempt >= max_retries:
                 raise
             # 2, 4, 8, 16초... (최대 30초) 대기 후 재시도

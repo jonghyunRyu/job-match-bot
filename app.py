@@ -10,7 +10,7 @@ import streamlit as st
 
 from src.config import PROFILE_PATH, get_settings, load_profile
 from src.ingest.loader import PdfProcessingError, load_image, load_pdf, load_text
-from src.llm.gemini import get_llm
+from src.llm.gemini import QuotaExceededError, get_llm
 from src.graph import run_graph
 
 st.set_page_config(page_title="공고 매칭봇", page_icon="🎯", layout="wide")
@@ -84,7 +84,12 @@ def run_pipeline(job_input, profile_text: str) -> None:
 
     with st.status("분석 중... (추출 → 매칭 → 리포트)", expanded=True) as status:
         st.write("공고 분석 그래프 실행 중...")
-        final_state = run_graph(job_input, profile_text, llm)
+        try:
+            final_state = run_graph(job_input, profile_text, llm)
+        except QuotaExceededError as e:
+            status.update(label="분석 실패", state="error", expanded=False)
+            st.error(str(e))
+            return
         status.update(label="분석 완료", state="complete", expanded=False)
 
     requirements = final_state.get("requirements")
