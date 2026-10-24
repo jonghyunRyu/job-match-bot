@@ -28,6 +28,8 @@ class Settings:
         ).strip()
         # RAG 검색 시 매칭에 넣을 프로필 청크 수
         self.rag_top_k: int = int(os.getenv("RAG_TOP_K", "4"))
+        # 일시적 서버 오류(503/429 등) 시 최대 재시도 횟수
+        self.llm_max_retries: int = int(os.getenv("LLM_MAX_RETRIES", "4"))
 
     @property
     def has_api_key(self) -> bool:
