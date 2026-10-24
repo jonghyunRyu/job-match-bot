@@ -50,7 +50,14 @@ cp .env.example .env
 
 ### 3. 프로필 작성
 
-`data/profile.md`에 본인의 경력/프로젝트/기술 스택을 채웁니다. (앱 사이드바에서도 편집·저장 가능)
+템플릿을 복사해 본인 내용으로 채웁니다. (앱 사이드바에서도 편집·저장 가능)
+
+```bash
+cp data/profile.example.md data/profile.md
+```
+
+`data/profile.md`는 개인정보를 담을 수 있어 git에 커밋되지 않습니다(`.gitignore`).
+직무에 관계없이 사용할 수 있으며, 경험/프로젝트를 각각 별도 섹션(`##`)으로 적으면 RAG 검색 품질이 올라갑니다.
 
 ### 4. (선택) 스캔형 PDF를 쓸 경우 poppler 설치
 
@@ -76,7 +83,7 @@ job-match-bot/
 ├── requirements.txt
 ├── .env.example
 ├── data/
-│   └── profile.md         # 내 프로필 (매칭 기준)
+│   └── profile.example.md # 프로필 템플릿 (profile.md로 복사해 사용)
 └── src/
     ├── config.py          # 설정/환경변수
     ├── schemas.py         # Pydantic 모델 (단계 간 계약)
